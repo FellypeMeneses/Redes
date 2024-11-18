@@ -1,41 +1,63 @@
+import tkinter as tk
 from socket import socket, AF_INET, SOCK_STREAM
 from threading import Thread
 
-# Função para gerenciar a conexão com o cliente
-def conexao_cliente(cliente_socket, endereco_cliente):
-    print(f'Conexão estabelecida com {endereco_cliente}')
-    
-    # Função para receber mensagens do cliente
-    def receber_mensagens():
-        while True:
-            try:
-                mensagem = cliente_socket.recv(1500)
-                if mensagem:
-                    print(f'Cliente ({endereco_cliente}): {mensagem.decode()}')
-                else:
-                    break
-            except:
-                break
-    
-    # Thread mensagem docliente
-    Thread(target=receber_mensagens).start()
-
-    # Loop mensagens ao cliente
+# Função para receber mensagens do servidor
+def receber_mensagens():
     while True:
-        mensagem_servidor = input("Servidor: ")
-        cliente_socket.send(mensagem_servidor.encode())
+        try:
+            mensagem = cliente_socket.recv(1500)
+            if mensagem:
+                log_text.insert(tk.END, f"Servidor: {mensagem.decode()}\n")
+            else:
+                break
+        except:
+            break
 
-    # Fecha a conexão com o cliente
-    cliente_socket.close()
+# Função para conectar ao servidor
+def conectar_servidor():
+    try:
+        cliente_socket.connect(('127.0.0.1', int(porta_entrada.get())))
+        log_text.insert(tk.END, f"Conectado ao servidor na porta {porta_entrada.get()}\n")
 
-#Socket do servidor
-server_socket = socket(AF_INET, SOCK_STREAM)
-server_socket.bind(('127.0.0.1', 8000))
-server_socket.listen()
+        # Thread para receber mensagens continuamente
+        Thread(target=receber_mensagens).start()
+    except Exception as e:
+        log_text.insert(tk.END, f"Erro ao conectar ao servidor: {e}\n")
 
-print('Servidor aguardando conexões na porta 8000')
+# Função para enviar mensagens ao servidor
+def enviar_mensagem():
+    mensagem = entrada_mensagem.get()
+    entrada_mensagem.delete(0, tk.END)
+    cliente_socket.send(mensagem.encode())
+    log_text.insert(tk.END, f"Você: {mensagem}\n")
 
-# Loop conexões de clientes
-while True:
-    cliente_socket, endereco_cliente = server_socket.accept()
-    Thread(target=conexao_cliente, args=(cliente_socket, endereco_cliente)).start()
+# Configuração da interface gráfica
+janela = tk.Tk()
+janela.title("Cliente")
+
+log_text = tk.Text(janela, height=15, width=50)
+log_text.pack()
+
+porta_entrada = tk.Entry(janela, width=10)
+porta_entrada.insert(0, "8000")  # Porta padrão
+porta_entrada.pack()
+
+entrada_mensagem = tk.Entry(janela, width=40)
+entrada_mensagem.pack()
+
+botao_enviar = tk.Button(janela, text="Enviar", command=enviar_mensagem)
+botao_enviar.pack()
+
+# Botão para conectar ao servidor
+botao_conectar = tk.Button(janela, text="Conectar", command=conectar_servidor)
+botao_conectar.pack()
+
+# Inicializa o socket do cliente
+cliente_socket = socket(AF_INET, SOCK_STREAM)
+
+# Loop principal da interface
+janela.mainloop()
+
+# Fecha a conexão ao sair
+cliente_socket.close()
