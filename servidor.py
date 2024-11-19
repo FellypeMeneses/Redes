@@ -4,11 +4,16 @@ from threading import Thread
 
 # Lista para manter os clientes conectados
 lista_clientes = []
+clientes_endereco = {}
 
 # Função para gerenciar conexões dos clientes
 def conexao_cliente(cliente_socket, endereco_cliente):
     lista_clientes.append(cliente_socket)
+    clientes_endereco[cliente_socket] = endereco_cliente
     log_text.insert(tk.END, f"Conexão estabelecida com {endereco_cliente}\n")
+    
+    # Atualiza a Listbox com os clientes conectados
+    clientes_lista.insert(tk.END, f"{endereco_cliente}")
 
     # Thread para receber mensagens do cliente
     def receber_mensagens():
@@ -23,10 +28,23 @@ def conexao_cliente(cliente_socket, endereco_cliente):
             except:
                 break
         lista_clientes.remove(cliente_socket)
+        del clientes_endereco[cliente_socket]
         cliente_socket.close()
         log_text.insert(tk.END, f"Conexão encerrada com {endereco_cliente}\n")
+        # Atualiza a Listbox ao remover cliente
+        clientes_lista.delete(0, tk.END)
+        for cliente in lista_clientes:
+            clientes_lista.insert(tk.END, f"{clientes_endereco[cliente]}")
 
     Thread(target=receber_mensagens).start()
+
+# Função para enviar mensagem a um cliente específico
+def enviar_mensagem_para_cliente():
+    mensagem = entrada_mensagem.get()  # Pega a mensagem digitada no campo de entrada
+    entrada_mensagem.delete(0, tk.END)  # Limpa o campo de entrada
+    cliente_selecionado = lista_clientes[clientes_lista.curselection()[0]]  # Pega o cliente selecionado
+    cliente_selecionado.send(mensagem.encode())  # Envia para o cliente
+    log_text.insert(tk.END, f"Servidor: {mensagem} para {clientes_endereco[cliente_selecionado]}\n")
 
 # Função para iniciar o servidor
 def iniciar_servidor():
@@ -48,14 +66,6 @@ def iniciar_servidor():
     except OSError as e:
         log_text.insert(tk.END, f"Erro ao iniciar servidor: {e}\n")
 
-# Função para enviar mensagens para todos os clientes
-def enviar_mensagem():
-    mensagem = entrada_mensagem.get()
-    entrada_mensagem.delete(0, tk.END)
-    for cliente in lista_clientes:
-        cliente.send(mensagem.encode())
-    log_text.insert(tk.END, f"Servidor: {mensagem}\n")
-
 # Configuração da interface gráfica
 janela = tk.Tk()
 janela.title("Servidor")
@@ -70,7 +80,12 @@ porta_entrada.pack()
 entrada_mensagem = tk.Entry(janela, width=40)
 entrada_mensagem.pack()
 
-botao_enviar = tk.Button(janela, text="Enviar", command=enviar_mensagem)
+# Lista de clientes conectados
+clientes_lista = tk.Listbox(janela, height=6, width=40)
+clientes_lista.pack()
+
+# Botão para enviar mensagem ao cliente selecionado
+botao_enviar = tk.Button(janela, text="Enviar para Cliente", command=enviar_mensagem_para_cliente)
 botao_enviar.pack()
 
 # Inicializa o socket do servidor
