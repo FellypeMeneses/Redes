@@ -18,7 +18,7 @@ def receber_mensagens():
 def conectar_servidor():
     try:
         cliente_socket.connect(('127.0.0.1', int(porta_entrada.get())))
-        log_text.insert(tk.END, f"Conectado ao servidor na porta {porta_entrada.get()}\n")
+        log_text.insert(tk.END, f"Conectado ao servidor na porta {porta_entrada.get()}...\n")
 
         # Thread para receber mensagens continuamente
         Thread(target=receber_mensagens).start()

@@ -1,40 +1,64 @@
 import tkinter as tk
-from socket import socket, AF_INET, SOCK_STREAM
+from socket import socket, AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR
 from threading import Thread
 
-# Função para receber mensagens do servidor
-def receber_mensagens():
-    while True:
-        try:
-            mensagem = cliente_socket.recv(1500)
-            if mensagem:
-                log_text.insert(tk.END, f"Servidor: {mensagem.decode()}\n")
-            else:
+# Lista para manter os clientes conectados
+lista_clientes = []
+
+# Função para gerenciar conexões dos clientes
+def conexao_cliente(cliente_socket, endereco_cliente):
+    lista_clientes.append(cliente_socket)
+    log_text.insert(tk.END, f"Conexão estabelecida com {endereco_cliente}\n")
+
+    # Thread para receber mensagens do cliente
+    def receber_mensagens():
+        while True:
+            try:
+                mensagem = cliente_socket.recv(1500)
+                if mensagem:
+                    texto = f"Cliente ({endereco_cliente}): {mensagem.decode()}\n"
+                    log_text.insert(tk.END, texto)
+                else:
+                    break
+            except:
                 break
-        except:
-            break
+        lista_clientes.remove(cliente_socket)
+        cliente_socket.close()
+        log_text.insert(tk.END, f"Conexão encerrada com {endereco_cliente}\n")
 
-# Função para conectar ao servidor
-def conectar_servidor():
+    Thread(target=receber_mensagens).start()
+
+# Função para iniciar o servidor
+def iniciar_servidor():
     try:
-        cliente_socket.connect(('127.0.0.1', int(porta_entrada.get())))
-        log_text.insert(tk.END, f"Conectado ao servidor na porta {porta_entrada.get()}\n")
+        # Configurações do socket
+        server_socket.setsockopt(SOL_SOCKET, SO_REUSEADDR, 1)  # Permite reutilização da porta
+        server_socket.bind(('127.0.0.1', int(porta_entrada.get())))
+        server_socket.listen(5)  # Permite até 5 conexões simultâneas
+        log_text.insert(tk.END, f"Servidor iniciado na porta {porta_entrada.get()}...\n")
 
-        # Thread para receber mensagens continuamente
-        Thread(target=receber_mensagens).start()
-    except Exception as e:
-        log_text.insert(tk.END, f"Erro ao conectar ao servidor: {e}\n")
+        # Thread para aceitar conexões
+        def aceitar_conexoes():
+            while True:
+                cliente_socket, endereco_cliente = server_socket.accept()
+                Thread(target=conexao_cliente, args=(cliente_socket, endereco_cliente)).start()
 
-# Função para enviar mensagens ao servidor
+        Thread(target=aceitar_conexoes).start()
+
+    except OSError as e:
+        log_text.insert(tk.END, f"Erro ao iniciar servidor: {e}\n")
+
+# Função para enviar mensagens para todos os clientes
 def enviar_mensagem():
     mensagem = entrada_mensagem.get()
     entrada_mensagem.delete(0, tk.END)
-    cliente_socket.send(mensagem.encode())
-    log_text.insert(tk.END, f"Você: {mensagem}\n")
+    for cliente in lista_clientes:
+        cliente.send(mensagem.encode())
+    log_text.insert(tk.END, f"Servidor: {mensagem}\n")
 
 # Configuração da interface gráfica
 janela = tk.Tk()
-janela.title("Cliente")
+janela.title("Servidor")
 
 log_text = tk.Text(janela, height=15, width=50)
 log_text.pack()
@@ -49,15 +73,12 @@ entrada_mensagem.pack()
 botao_enviar = tk.Button(janela, text="Enviar", command=enviar_mensagem)
 botao_enviar.pack()
 
-# Botão para conectar ao servidor
-botao_conectar = tk.Button(janela, text="Conectar", command=conectar_servidor)
-botao_conectar.pack()
+# Inicializa o socket do servidor
+server_socket = socket(AF_INET, SOCK_STREAM)
 
-# Inicializa o socket do cliente
-cliente_socket = socket(AF_INET, SOCK_STREAM)
+# Botão para iniciar o servidor
+botao_iniciar = tk.Button(janela, text="Iniciar Servidor", command=iniciar_servidor)
+botao_iniciar.pack()
 
-# Loop principal da interface
+# Executa o loop principal
 janela.mainloop()
-
-# Fecha a conexão ao sair
-cliente_socket.close()
